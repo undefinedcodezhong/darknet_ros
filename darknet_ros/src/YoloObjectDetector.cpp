@@ -160,11 +160,22 @@ void YoloObjectDetector::init()
 
   imageSubscriber_ = imageTransport_.subscribe(cameraTopicName, cameraQueueSize,
                                                &YoloObjectDetector::cameraCallback, this);
+  imageDepthSubscriber_ = imageTransport_.subscribe("/head_xtion/depth/image_raw", cameraQueueSize,
+                                               &YoloObjectDetector::cameraDepthCallback, this);
+
   objectPublisher_ = nodeHandle_.advertise<std_msgs::Int8>(objectDetectorTopicName,
                                                            objectDetectorQueueSize,
                                                            objectDetectorLatch);
   boundingBoxesPublisher_ = nodeHandle_.advertise<darknet_ros_msgs::BoundingBoxes>(
-      boundingBoxesTopicName, boundingBoxesQueueSize, boundingBoxesLatch);
+  boundingBoxesTopicName, boundingBoxesQueueSize, boundingBoxesLatch);
+
+
+  rgbPublisher_ = imageTransport_.advertise("darknet/sync_rgb_image", 5);
+  depthPublisher_ = imageTransport_.advertise("darknet/sync_depth_image", 5);
+
+
+  boundingBoxesPublisher_ = nodeHandle_.advertise<darknet_ros_msgs::BoundingBoxes>(
+          boundingBoxesTopicName, boundingBoxesQueueSize, boundingBoxesLatch);
   detectionImagePublisher_ = nodeHandle_.advertise<sensor_msgs::Image>(detectionImageTopicName,
                                                                        detectionImageQueueSize,
                                                                        detectionImageLatch);
@@ -185,6 +196,10 @@ void YoloObjectDetector::init()
 void YoloObjectDetector::cameraCallback(const sensor_msgs::ImageConstPtr& msg)
 {
   ROS_DEBUG("[YoloObjectDetector] USB image received.");
+  if (!syncRgb) {
+    rgbImage = std::move(msg);
+    syncRgb = true;
+  }
 
   cv_bridge::CvImagePtr cam_image;
 
@@ -209,6 +224,14 @@ void YoloObjectDetector::cameraCallback(const sensor_msgs::ImageConstPtr& msg)
   }
   return;
 }
+void YoloObjectDetector::cameraDepthCallback(const sensor_msgs::ImageConstPtr& msg)
+{
+  if (!syncDepth) {
+    depthImage = std::move(msg);
+    syncDepth = true;
+  }
+}
+
 
 void YoloObjectDetector::checkForObjectsActionGoalCB()
 {
@@ -572,6 +595,15 @@ bool YoloObjectDetector::isNodeRunning(void)
 
 void *YoloObjectDetector::publishInThread()
 {
+
+
+  rgbPublisher_.publish(rgbImage);
+  depthPublisher_.publish(depthImage);
+  syncDepth = false;
+  syncRgb = false;
+
+
+
   // Publish image.
   cv::Mat cvImage = cv::cvarrToMat(ipl_);
   if (!publishDetectionImage(cv::Mat(cvImage))) {
@@ -614,6 +646,7 @@ void *YoloObjectDetector::publishInThread()
         }
       }
     }
+
     boundingBoxesResults_.header.stamp = ros::Time::now();
     boundingBoxesResults_.header.frame_id = "detection";
     boundingBoxesPublisher_.publish(boundingBoxesResults_);

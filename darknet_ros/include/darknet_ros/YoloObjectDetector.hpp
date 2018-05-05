@@ -99,6 +99,7 @@ class YoloObjectDetector
    * @param[in] msg image pointer.
    */
   void cameraCallback(const sensor_msgs::ImageConstPtr& msg);
+  void cameraDepthCallback(const sensor_msgs::ImageConstPtr& msg);
 
   /*!
    * Check for objects action goal callback.
@@ -141,8 +142,11 @@ class YoloObjectDetector
 
   //! ROS subscriber and publisher.
   image_transport::Subscriber imageSubscriber_;
+  image_transport::Subscriber imageDepthSubscriber_;
   ros::Publisher objectPublisher_;
   ros::Publisher boundingBoxesPublisher_;
+  image_transport::Publisher rgbPublisher_;
+  image_transport::Publisher depthPublisher_;
 
   //! Detected objects.
   std::vector<std::vector<RosBox_> > rosBoxes_;
@@ -194,6 +198,11 @@ class YoloObjectDetector
   int waitKeyDelay_;
   int fullScreen_;
   char *demoPrefix_;
+  bool syncRgb;
+  bool syncDepth;
+
+  sensor_msgs::ImageConstPtr rgbImage;
+  sensor_msgs::ImageConstPtr depthImage;
 
   cv::Mat camImageCopy_;
   boost::shared_mutex mutexImageCallback_;
