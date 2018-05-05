@@ -128,6 +128,9 @@ void YoloObjectDetector::init()
 
   // Initialize publisher and subscriber.
   std::string cameraTopicName;
+  std::string cameraDepthTopicName;
+  std::string cameraSyncTopicName;
+  std::string cameraDepthSyncTopicName;
   int cameraQueueSize;
   std::string objectDetectorTopicName;
   int objectDetectorQueueSize;
@@ -139,12 +142,22 @@ void YoloObjectDetector::init()
   int detectionImageQueueSize;
   bool detectionImageLatch;
   int rate;
+  syncDepth = false;
+  syncRgb = false;
+
   nodeHandle_.param("frame_rate", rate, 2);
   run_period = std::chrono::duration<double>(1.0/rate);
 
-  nodeHandle_.param("subscribers/camera_reading/topic", cameraTopicName,
-                    std::string("/camera/image_raw"));
   nodeHandle_.param("subscribers/camera_reading/queue_size", cameraQueueSize, 1);
+  nodeHandle_.param("subscribers/camera_reading/topic", cameraTopicName,
+                    std::string("/camera/rgb/image_raw"));
+  nodeHandle_.param("subscribers/camera_depth_reading/queue_size", cameraQueueSize, 1);
+  nodeHandle_.param("subscribers/camera_depth_reading/topic", cameraDepthTopicName,
+                    std::string("/camera/depth/image_raw"));
+  nodeHandle_.param("publishers/camera_sync/rgb_topic", cameraSyncTopicName,
+                    std::string("/sync/rgb/image"));
+  nodeHandle_.param("publishers/camera_sync/depth_topic", cameraDepthSyncTopicName,
+                    std::string("/sync/depth/image"));
   nodeHandle_.param("publishers/object_detector/topic", objectDetectorTopicName,
                     std::string("found_object"));
   nodeHandle_.param("publishers/object_detector/queue_size", objectDetectorQueueSize, 1);
@@ -160,7 +173,7 @@ void YoloObjectDetector::init()
 
   imageSubscriber_ = imageTransport_.subscribe(cameraTopicName, cameraQueueSize,
                                                &YoloObjectDetector::cameraCallback, this);
-  imageDepthSubscriber_ = imageTransport_.subscribe("/head_xtion/depth/image_raw", cameraQueueSize,
+  imageDepthSubscriber_ = imageTransport_.subscribe(cameraDepthTopicName, cameraQueueSize,
                                                &YoloObjectDetector::cameraDepthCallback, this);
 
   objectPublisher_ = nodeHandle_.advertise<std_msgs::Int8>(objectDetectorTopicName,
@@ -170,8 +183,8 @@ void YoloObjectDetector::init()
   boundingBoxesTopicName, boundingBoxesQueueSize, boundingBoxesLatch);
 
 
-  rgbPublisher_ = imageTransport_.advertise("darknet/sync_rgb_image", 5);
-  depthPublisher_ = imageTransport_.advertise("darknet/sync_depth_image", 5);
+  rgbPublisher_ = imageTransport_.advertise(cameraSyncTopicName, 5);
+  depthPublisher_ = imageTransport_.advertise(cameraDepthSyncTopicName, 5);
 
 
   boundingBoxesPublisher_ = nodeHandle_.advertise<darknet_ros_msgs::BoundingBoxes>(
@@ -596,11 +609,14 @@ bool YoloObjectDetector::isNodeRunning(void)
 void *YoloObjectDetector::publishInThread()
 {
 
-
-  rgbPublisher_.publish(rgbImage);
-  depthPublisher_.publish(depthImage);
-  syncDepth = false;
-  syncRgb = false;
+  if (syncDepth) {
+    depthPublisher_.publish(depthImage);
+    syncDepth = false;
+  }
+  if (syncRgb) {
+    rgbPublisher_.publish(rgbImage);
+    syncRgb = false;
+  }
 
 
 
