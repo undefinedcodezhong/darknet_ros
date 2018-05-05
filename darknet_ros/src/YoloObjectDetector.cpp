@@ -185,13 +185,12 @@ void YoloObjectDetector::init()
 
   rgbPublisher_ = imageTransport_.advertise(cameraSyncTopicName, 5);
   depthPublisher_ = imageTransport_.advertise(cameraDepthSyncTopicName, 5);
-
+  detectionImagePublisher_ = imageTransport_.advertise(detectionImageTopicName,
+                                                         detectionImageQueueSize,
+                                                         detectionImageLatch);
 
   boundingBoxesPublisher_ = nodeHandle_.advertise<darknet_ros_msgs::BoundingBoxes>(
           boundingBoxesTopicName, boundingBoxesQueueSize, boundingBoxesLatch);
-  detectionImagePublisher_ = nodeHandle_.advertise<sensor_msgs::Image>(detectionImageTopicName,
-                                                                       detectionImageQueueSize,
-                                                                       detectionImageLatch);
 
   // Action servers.
   std::string checkForObjectsActionName;
