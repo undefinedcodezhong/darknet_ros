@@ -662,9 +662,9 @@ void *YoloObjectDetector::publishInThread()
       }
     }
 
-    boundingBoxesResults_.header.stamp = ros::Time::now();
     boundingBoxesResults_.header.frame_id = "detection";
     boundingBoxesPublisher_.publish(boundingBoxesResults_);
+    boundingBoxesResults_.header.stamp = ros::Time::now();
   } else {
     std_msgs::Int8 msg;
     msg.data = 0;
