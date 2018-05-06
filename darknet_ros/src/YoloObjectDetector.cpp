@@ -580,8 +580,8 @@ void YoloObjectDetector::yolo()
     std::chrono::time_point<std::chrono::system_clock> end = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_time = end-start;
 
-
-    std::this_thread::sleep_for(run_period - elapsed_time);  // Sleep a bit so you don't kill my GPU!
+    if (run_period > elapsed_time)
+      std::this_thread::sleep_for(run_period - elapsed_time);  // Sleep a bit so you don't kill my GPU!
   }
 
 }
