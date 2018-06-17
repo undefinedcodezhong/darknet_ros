@@ -1,5 +1,5 @@
 
-frame_rate: 5
+frame_rate: 6
 
 subscribers:
 
@@ -29,7 +29,7 @@ publishers:
     latch: false
 
   detection_image:
-    topic: /darknet_ros/detection_image
+    topic: /dump
     queue_size: 1
     latch: false
 
