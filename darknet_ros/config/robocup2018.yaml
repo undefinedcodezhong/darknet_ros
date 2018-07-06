@@ -1,0 +1,30 @@
+yolo_model:
+
+  config_file:
+    name: robocup2018.cfg
+  weight_file:
+    name: yolo-robocup2018.weights
+  threshold:
+    value: 0.5
+  detection_classes:
+    names:
+      - bag
+      - cloth
+      - scrubby
+      - sponge
+      - basket
+      - tray
+      - chocolate drink
+      - coke
+      - grape juice
+      - orange juice
+      - sprite
+      - cereal
+      - noodles
+      - sausages
+      - apple
+      - orange
+      - paprika
+      - crackers
+      - potato chips
+      - pringles

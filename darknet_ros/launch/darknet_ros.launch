@@ -10,8 +10,9 @@
   <arg name="yolo_config_path"           default="$(find darknet_ros)/yolo_network_config/cfg"/>
 
   <!-- Load parameters -->
-  <rosparam command="load" ns="$(arg node_name)" file="$(find darknet_ros)/config/ros.yaml"/>
-  <rosparam command="load" ns="$(arg node_name)" file="$(find darknet_ros)/config/tiny_yolo.yaml"/>
+
+  <rosparam command="load" ns="darknet_ros" file="$(find darknet_ros)/config/ros.yaml"/>
+  <rosparam command="load" ns="darknet_ros" file="$(find darknet_ros)/config/robocup2018.yaml"/>
 
 
   <!-- Start darknet and ros wrapper -->
