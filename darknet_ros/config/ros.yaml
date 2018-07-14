@@ -23,8 +23,13 @@ publishers:
     queue_size: 1
     latch: false
 
-  bounding_boxes:
-    topic: /darknet_ros/bounding_boxes
+  bounding_boxes2D:
+    topic: /darknet_ros/bounding_boxes2D
+    queue_size: 1
+    latch: false
+
+  bounding_boxes3D:
+    topic: /darknet_ros/bounding_boxes3D
     queue_size: 1
     latch: false
 

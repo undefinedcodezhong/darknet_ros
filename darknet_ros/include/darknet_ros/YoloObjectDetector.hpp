@@ -154,8 +154,6 @@ class YoloObjectDetector
   //! Detected objects.
   std::vector<std::vector<RosBox_> > rosBoxes_;
   std::vector<int> rosBoxCounter_;
-  sara_msgs::BoundingBoxes2D boundingBoxes2DResults_;
-  sara_msgs::BoundingBoxes3D boundingBoxes3DResults_;
 
   //! Camera related parameters.
   int frameWidth_;
@@ -166,6 +164,7 @@ class YoloObjectDetector
 
   //! Frame_to_box client
   ros::ServiceClient frameToBoxClient;
+  wm_frame_to_box::GetBoundingBoxes3D frameToBoxForm;
 
   // Yolo running on thread.
   std::thread yoloThread_;
