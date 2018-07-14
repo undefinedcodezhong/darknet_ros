@@ -192,7 +192,7 @@ void YoloObjectDetector::init()
           boundingBoxes2DTopicName, boundingBoxes2DQueueSize, boundingBoxes2DLatch);
   boundingBoxes3DPublisher_ = nodeHandle_.advertise<sara_msgs::BoundingBoxes3D>(
           boundingBoxes3DTopicName, boundingBoxes2DQueueSize, boundingBoxes3DLatch);
-  frameToBoxClient = nodeHandle_.serviceClient<wm_frame_to_box::GetBoundingBoxes3D>("get_3d_bounding_boxes");
+  frameToBoxClient = nodeHandle_.serviceClient<wm_frame_to_box::GetBoundingBoxes3D>("/get_3d_bounding_boxes");
 
 
   rgbPublisher_ = imageTransport_.advertise(cameraSyncTopicName, 5);
@@ -675,6 +675,10 @@ void *YoloObjectDetector::publishInThread()
     }
 
     // Fill the 3D bounding boxes list
+    frameToBoxClient.waitForExistence();
+    frameToBoxForm.request.image = *depthImage;
+    frameToBoxForm.request.input_frame = depthImage->header.frame_id;
+    frameToBoxForm.request.output_frame = depthImage->header.frame_id;
     frameToBoxClient.call(frameToBoxForm);
 
     // Publish all of the bounding boxes

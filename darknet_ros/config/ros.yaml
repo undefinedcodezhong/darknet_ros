@@ -39,7 +39,7 @@ publishers:
     latch: false
 
   camera_sync:
-    enable: false
+    enable: true
     rgb_topic: /darknet_ros/sync/rgb/image
     depth_topic: /darknet_ros/sync/depth/image
 
