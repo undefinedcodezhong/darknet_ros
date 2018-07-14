@@ -32,9 +32,7 @@
 #include <opencv2/objdetect/objdetect.hpp>
 #include <cv_bridge/cv_bridge.h>
 
-// darknet_ros_msgs
-#include <darknet_ros_msgs/BoundingBoxes.h>
-#include <darknet_ros_msgs/BoundingBox.h>
+// ros_msgs
 #include <sara_msgs/BoundingBoxes2D.h>
 #include <sara_msgs/BoundingBox2D.h>
 #include <sara_msgs/BoundingBoxes3D.h>
@@ -204,8 +202,9 @@ class YoloObjectDetector
   char *demoPrefix_;
   bool syncRgb;
   bool syncDepth;
+  bool publishSyncEnable;
 
-  sensor_msgs::ImageConstPtr rgbImage;
+    sensor_msgs::ImageConstPtr rgbImage;
   sensor_msgs::ImageConstPtr depthImage;
 
   cv::Mat camImageCopy_;

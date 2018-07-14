@@ -144,6 +144,7 @@ void YoloObjectDetector::init()
   int rate;
   syncDepth = false;
   syncRgb = false;
+  publishSyncEnable = false;
 
   nodeHandle_.param("frame_rate", rate, 2);
   run_period = std::chrono::duration<double>(1.0/rate);
@@ -158,6 +159,7 @@ void YoloObjectDetector::init()
                     std::string("/sync/rgb/image"));
   nodeHandle_.param("publishers/camera_sync/depth_topic", cameraDepthSyncTopicName,
                     std::string("/sync/depth/image"));
+  nodeHandle_.param("publishers/camera_sync/enable", publishSyncEnable, false);
   nodeHandle_.param("publishers/object_detector/topic", objectDetectorTopicName,
                     std::string("found_object"));
   nodeHandle_.param("publishers/object_detector/queue_size", objectDetectorQueueSize, 1);
@@ -609,11 +611,11 @@ void *YoloObjectDetector::publishInThread()
 {
 
   if (syncDepth) {
-    depthPublisher_.publish(depthImage);
+    if (publishSyncEnable) depthPublisher_.publish(depthImage);
     syncDepth = false;
   }
   if (syncRgb) {
-    rgbPublisher_.publish(rgbImage);
+    if (publishSyncEnable) rgbPublisher_.publish(rgbImage);
     syncRgb = false;
   }
 
