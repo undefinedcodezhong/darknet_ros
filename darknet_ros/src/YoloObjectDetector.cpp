@@ -181,8 +181,11 @@ void YoloObjectDetector::init()
   objectPublisher_ = nodeHandle_.advertise<std_msgs::Int8>(objectDetectorTopicName,
                                                            objectDetectorQueueSize,
                                                            objectDetectorLatch);
-  boundingBoxesPublisher_ = nodeHandle_.advertise<sara_msgs::BoundingBoxes2D>(
-  boundingBoxesTopicName, boundingBoxesQueueSize, boundingBoxesLatch);
+  boundingBoxes2DPublisher_ = nodeHandle_.advertise<sara_msgs::BoundingBoxes2D>(
+          boundingBoxesTopicName, boundingBoxesQueueSize, boundingBoxesLatch);
+  boundingBoxes3DPublisher_ = nodeHandle_.advertise<sara_msgs::BoundingBoxes3D>(
+          boundingBoxesTopicName, boundingBoxesQueueSize, boundingBoxesLatch);
+  frameToBoxClient = nodeHandle_.serviceClient<wm_frame_to_box::GetBoundingBoxes3D>("get_3d_bounding_boxes");
 
 
   rgbPublisher_ = imageTransport_.advertise(cameraSyncTopicName, 5);
@@ -190,10 +193,6 @@ void YoloObjectDetector::init()
   detectionImagePublisher_ = imageTransport_.advertise(detectionImageTopicName,
                                                          detectionImageQueueSize,
                                                          detectionImageLatch);
-
-  boundingBoxesPublisher_ = nodeHandle_.advertise<sara_msgs::BoundingBoxes2D>(
-          boundingBoxesTopicName, boundingBoxesQueueSize, boundingBoxesLatch);
-
   // Action servers.
   std::string checkForObjectsActionName;
   nodeHandle_.param("actions/camera_reading/topic", checkForObjectsActionName,
@@ -645,7 +644,8 @@ void *YoloObjectDetector::publishInThread()
 
     for (int i = 0; i < numClasses_; i++) {
       if (rosBoxCounter_[i] > 0) {
-        sara_msgs::BoundingBox2D boundingBox;
+        sara_msgs::BoundingBox2D boundingBox2D;
+        sara_msgs::BoundingBox3D boundingBox3D;
 
         for (int j = 0; j < rosBoxCounter_[i]; j++) {
           int xmin = (rosBoxes_[i][j].x - rosBoxes_[i][j].w / 2) * frameWidth_;
@@ -653,20 +653,37 @@ void *YoloObjectDetector::publishInThread()
           int xmax = (rosBoxes_[i][j].x + rosBoxes_[i][j].w / 2) * frameWidth_;
           int ymax = (rosBoxes_[i][j].y + rosBoxes_[i][j].h / 2) * frameHeight_;
 
-          boundingBox.Class = classLabels_[i];
-          boundingBox.probability = rosBoxes_[i][j].prob;
-          boundingBox.xmin = xmin;
-          boundingBox.ymin = ymin;
-          boundingBox.xmax = xmax;
-          boundingBox.ymax = ymax;
-          boundingBoxesResults_.boundingBoxes.push_back(boundingBox);
+          // Filling 2D bounding boxes
+          boundingBox2D.Class = classLabels_[i];
+          boundingBox2D.probability = rosBoxes_[i][j].prob;
+          boundingBox2D.xmin = xmin;
+          boundingBox2D.ymin = ymin;
+          boundingBox2D.xmax = xmax;
+          boundingBox2D.ymax = ymax;
+          boundingBoxes2DResults_.boundingBoxes.push_back(boundingBox2D);
+
+
         }
       }
     }
 
-    boundingBoxesResults_.header.frame_id = "detection";
-    boundingBoxesPublisher_.publish(boundingBoxesResults_);
-    boundingBoxesResults_.header.stamp = ros::Time::now();
+//TODO
+      // Filling 3D bounding boxes
+      wm_frame_to_box::GetBoundingBoxes3DRequest req;
+      req.boundingBoxes2D = boundingBoxes2DResults_;
+      wm_frame_to_box::GetBoundingBoxes3D serv;
+      serv.request.boundingBoxes2D = boundingBoxes2DResults_;
+      frameToBoxClient.call(serv);
+      boundingBoxes3DResults_ = serv.response.boundingBoxes3D;
+//TODO
+
+
+
+
+
+      boundingBoxes2DResults_.header.frame_id = "detection";
+    boundingBoxes2DPublisher_.publish(boundingBoxes2DResults_);
+    boundingBoxes2DResults_.header.stamp = ros::Time::now();
   } else {
     std_msgs::Int8 msg;
     msg.data = 0;
@@ -676,10 +693,11 @@ void *YoloObjectDetector::publishInThread()
     ROS_DEBUG("[YoloObjectDetector] check for objects in image.");
     darknet_ros_msgs::CheckForObjectsResult objectsActionResult;
     objectsActionResult.id = buffId_[0];
-    objectsActionResult.boundingBoxes = boundingBoxesResults_;
+    objectsActionResult.boundingBoxes = boundingBoxes2DResults_;
     checkForObjectsActionServer_->setSucceeded(objectsActionResult, "Send bounding boxes.");
   }
-  boundingBoxesResults_.boundingBoxes.clear();
+  boundingBoxes2DResults_.boundingBoxes.clear();
+  boundingBoxes3DResults_.boundingBoxes.clear();
   for (int i = 0; i < numClasses_; i++) {
     rosBoxes_[i].clear();
     rosBoxCounter_[i] = 0;
