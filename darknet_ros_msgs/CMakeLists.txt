@@ -11,6 +11,7 @@ find_package(catkin REQUIRED
     sensor_msgs
     std_msgs
     message_generation
+    sara_msgs
 )
 
 add_message_files(
@@ -30,6 +31,7 @@ generate_messages(
     geometry_msgs
     sensor_msgs
     std_msgs
+    sara_msgs
 )
 
 catkin_package(

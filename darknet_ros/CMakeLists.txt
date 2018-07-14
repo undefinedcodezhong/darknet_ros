@@ -75,6 +75,7 @@ catkin_package(
     rospy
     std_msgs
     darknet_ros_msgs
+    sara_msgs
     image_transport
   DEPENDS
     Boost

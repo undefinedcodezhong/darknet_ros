@@ -179,7 +179,7 @@ void YoloObjectDetector::init()
   objectPublisher_ = nodeHandle_.advertise<std_msgs::Int8>(objectDetectorTopicName,
                                                            objectDetectorQueueSize,
                                                            objectDetectorLatch);
-  boundingBoxesPublisher_ = nodeHandle_.advertise<darknet_ros_msgs::BoundingBoxes>(
+  boundingBoxesPublisher_ = nodeHandle_.advertise<sara_msgs::BoundingBoxes2D>(
   boundingBoxesTopicName, boundingBoxesQueueSize, boundingBoxesLatch);
 
 
@@ -189,7 +189,7 @@ void YoloObjectDetector::init()
                                                          detectionImageQueueSize,
                                                          detectionImageLatch);
 
-  boundingBoxesPublisher_ = nodeHandle_.advertise<darknet_ros_msgs::BoundingBoxes>(
+  boundingBoxesPublisher_ = nodeHandle_.advertise<sara_msgs::BoundingBoxes2D>(
           boundingBoxesTopicName, boundingBoxesQueueSize, boundingBoxesLatch);
 
   // Action servers.
@@ -643,7 +643,7 @@ void *YoloObjectDetector::publishInThread()
 
     for (int i = 0; i < numClasses_; i++) {
       if (rosBoxCounter_[i] > 0) {
-        darknet_ros_msgs::BoundingBox boundingBox;
+        sara_msgs::BoundingBox2D boundingBox;
 
         for (int j = 0; j < rosBoxCounter_[i]; j++) {
           int xmin = (rosBoxes_[i][j].x - rosBoxes_[i][j].w / 2) * frameWidth_;

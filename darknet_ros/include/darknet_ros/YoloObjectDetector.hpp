@@ -35,6 +35,10 @@
 // darknet_ros_msgs
 #include <darknet_ros_msgs/BoundingBoxes.h>
 #include <darknet_ros_msgs/BoundingBox.h>
+#include <sara_msgs/BoundingBoxes2D.h>
+#include <sara_msgs/BoundingBox2D.h>
+#include <sara_msgs/BoundingBoxes3D.h>
+#include <sara_msgs/BoundingBox3D.h>
 #include <darknet_ros_msgs/CheckForObjectsAction.h>
 
 // Darknet.
@@ -151,7 +155,7 @@ class YoloObjectDetector
   //! Detected objects.
   std::vector<std::vector<RosBox_> > rosBoxes_;
   std::vector<int> rosBoxCounter_;
-  darknet_ros_msgs::BoundingBoxes boundingBoxesResults_;
+  sara_msgs::BoundingBoxes2D boundingBoxesResults_;
 
   //! Camera related parameters.
   int frameWidth_;
