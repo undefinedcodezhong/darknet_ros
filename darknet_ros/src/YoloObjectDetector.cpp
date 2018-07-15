@@ -655,10 +655,10 @@ void *YoloObjectDetector::publishInThread()
         sara_msgs::BoundingBox3D boundingBox3D;
 
         for (int j = 0; j < rosBoxCounter_[i]; j++) {
-          int xmin = (rosBoxes_[i][j].x - rosBoxes_[i][j].w / 2) * frameWidth_;
-          int ymin = (rosBoxes_[i][j].y - rosBoxes_[i][j].h / 2) * frameHeight_;
-          int xmax = (rosBoxes_[i][j].x + rosBoxes_[i][j].w / 2) * frameWidth_;
-          int ymax = (rosBoxes_[i][j].y + rosBoxes_[i][j].h / 2) * frameHeight_;
+          auto xmin = int((rosBoxes_[i][j].x - rosBoxes_[i][j].w / 2) * frameWidth_);
+          auto ymin = int((rosBoxes_[i][j].y - rosBoxes_[i][j].h / 2) * frameHeight_);
+          auto xmax = int((rosBoxes_[i][j].x + rosBoxes_[i][j].w / 2) * frameWidth_);
+          auto ymax = int((rosBoxes_[i][j].y + rosBoxes_[i][j].h / 2) * frameHeight_);
 
           // Filling 2D bounding boxes
           boundingBox2D.Class = classLabels_[i];
