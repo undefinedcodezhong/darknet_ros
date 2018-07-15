@@ -31,6 +31,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/objdetect/objdetect.hpp>
 #include <cv_bridge/cv_bridge.h>
+#include <opencv2/tracking/tracker.hpp>
 
 // ros_msgs
 #include <sara_msgs/BoundingBoxes2D.h>
@@ -249,6 +250,8 @@ class YoloObjectDetector
   bool isNodeRunning(void);
 
   void *publishInThread();
+
+  cv::MultiTracker Tracker_;
 };
 
 } /* namespace darknet_ros*/

@@ -31,7 +31,8 @@ YoloObjectDetector::YoloObjectDetector(ros::NodeHandle nh)
       numClasses_(0),
       classLabels_(0),
       rosBoxes_(0),
-      rosBoxCounter_(0)
+      rosBoxCounter_(0),
+      Tracker_()
 {
   ROS_INFO("[YoloObjectDetector] Node started.");
 
@@ -674,8 +675,14 @@ void *YoloObjectDetector::publishInThread()
       }
     }
 
+    Tracker_.add(cv::TrackerMOSSE, rgbImage, )
+
+
     // Fill the 3D bounding boxes list
-    frameToBoxClient.waitForExistence();
+    if (!frameToBoxClient.waitForExistence(ros::Duration(1))){
+        ROS_WARN("Waiting for service get_3D_bounding_boxes");
+        frameToBoxClient.waitForExistence();
+    }
     frameToBoxForm.request.image = *depthImage;
     frameToBoxForm.request.input_frame = depthImage->header.frame_id;
     frameToBoxForm.request.output_frame = depthImage->header.frame_id;
