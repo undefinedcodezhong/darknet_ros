@@ -32,10 +32,9 @@ namespace darknet_ros {
               numClasses_(0),
               classLabels_(0),
               rosBoxes_(0),
-              rosBoxCounter_(0),
-              tracker_() {
+              rosBoxCounter_(0) {
         ROS_INFO("[YoloObjectDetector] Node started.");
-
+        trackers_ = nullptr;
         // Read parameters from config file.
         if (!readParameters()) {
             ros::requestShutdown();
@@ -214,22 +213,48 @@ namespace darknet_ros {
     void YoloObjectDetector::cameraCallback(const sensor_msgs::ImageConstPtr &msg) {
         cv_bridge::CvImagePtr cam_image;
         ROS_DEBUG("[YoloObjectDetector] USB image received.");
-        if (!syncRgb) {
-            rgbImage = std::move(msg);
+        try {
+            cam_image = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+        } catch (cv_bridge::Exception &e) {
+            ROS_ERROR("cv_bridge exception: %s", e.what());
+            return;
+        }
+
+        if (trackers_ != nullptr){
             try {
-                cam_image = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
-            } catch (cv_bridge::Exception &e) {
-                ROS_ERROR("cv_bridge exception: %s", e.what());
+                ROS_INFO("update trackers");
+                trackers_->update(cam_image->image);
+            }
+            catch (cv::Exception &e) {
+                ROS_ERROR("cv exception: %s", e.what());
                 return;
             }
 
+            std::vector<RosBox_> boxes;
+            for (auto &box : trackers_->getObjects()) {
+                std::cout << "\n" << box;
+
+                auto xmin = box.x / frameWidth_;
+                auto ymin = box.y / frameHeight_;
+                auto xmax = box.width / frameWidth_;
+                auto ymax = box.width / frameHeight_;
+
+                boxes.push_back(RosBox_{xmin, ymin, xmax, ymax});
+
+            }
+            publishInThread(cam_image->image, boxes);
+        }
+        if (!syncRgb) {
+            rgbImage = std::move(msg);
+
+
             if (cam_image) {
                 {
-//                    boost::unique_lock<boost::shared_mutex> lockImageCallback(mutexImageCallback_);
+                    boost::unique_lock<boost::shared_mutex> lockImageCallback(mutexImageCallback_);
                     camImageCopy_ = cam_image->image.clone();
                 }
                 {
-//                    boost::unique_lock<boost::shared_mutex> lockImageStatus(mutexImageStatus_);
+                    boost::unique_lock<boost::shared_mutex> lockImageStatus(mutexImageStatus_);
                     imageStatus_ = true;
                 }
                 frameWidth_ = cam_image->image.size().width;
@@ -237,18 +262,6 @@ namespace darknet_ros {
             }
             syncRgb = true;
         }
-
-
-
-//        tracker_.update(cam_image->image);
-//
-//
-//        std::vector<RosBox_> boxes;
-//        for (auto &box : tracker_.getObjects()) {
-//            std::cout << "\n" << box;
-//            boxes.push_back(RosBox_{box.x, box.y, box.x + box.width, box.y + box.height});
-//        }
-//        publishInThread(cam_image->image, boxes);
 
 
         return;
@@ -280,15 +293,15 @@ namespace darknet_ros {
 
         if (cam_image) {
             {
-//                boost::unique_lock<boost::shared_mutex> lockImageCallback(mutexImageCallback_);
+                boost::unique_lock<boost::shared_mutex> lockImageCallback(mutexImageCallback_);
                 camImageCopy_ = cam_image->image.clone();
             }
             {
-//                boost::unique_lock<boost::shared_mutex> lockImageCallback(mutexActionStatus_);
+                boost::unique_lock<boost::shared_mutex> lockImageCallback(mutexActionStatus_);
                 actionId_ = imageActionPtr->id;
             }
             {
-//                boost::unique_lock<boost::shared_mutex> lockImageStatus(mutexImageStatus_);
+                boost::unique_lock<boost::shared_mutex> lockImageStatus(mutexImageStatus_);
                 imageStatus_ = true;
             }
             frameWidth_ = cam_image->image.size().width;
@@ -330,13 +343,13 @@ namespace darknet_ros {
 
     void *YoloObjectDetector::fetchInThread() {
         IplImage *ROS_img = getIplImage();
-        ipl_into_image(ROS_img, buff_[buffIndex_]);
+        ipl_into_image(ROS_img, buff_[0]);
         {
             boost::shared_lock<boost::shared_mutex> lock(mutexImageCallback_);
             buffId_[buffIndex_] = actionId_;
         }
-        rgbgr_image(buff_[buffIndex_]);
-        letterbox_image_into(buff_[buffIndex_], net_.w, net_.h, buffLetter_[buffIndex_]);
+        rgbgr_image(buff_[0]);
+        letterbox_image_into(buff_[0], net_.w, net_.h, buffLetter_[0]);
         return 0;
     }
 
@@ -345,7 +358,7 @@ namespace darknet_ros {
         float nms = .4;
 
         layer l = net_.layers[net_.n - 1];
-        float *X = buffLetter_[(buffIndex_ + 2) % 3].data;
+        float *X = buffLetter_[0].data;
         float *prediction = network_predict(net_, X);
 
         memcpy(predictions_[demoIndex_], prediction, l.outputs * sizeof(float));
@@ -368,7 +381,7 @@ namespace darknet_ros {
             printf("\nFPS:%.1f\n", fps_);
             printf("Objects:\n\n");
         }
-        image display = buff_[(buffIndex_ + 2) % 3];
+        image display = buff_[0];
         draw_detections(display, demoDetections_, demoThresh_, boxes_, probs_, demoNames_, demoAlphabet_,
                         demoClasses_);
 
@@ -428,7 +441,7 @@ namespace darknet_ros {
     }
 
     void *YoloObjectDetector::displayInThread(void *ptr) {
-        show_image_cv(buff_[(buffIndex_ + 1) % 3], "Demo", ipl_);
+        show_image_cv(buff_[0], "Demo", ipl_);
         int c = cvWaitKey(waitKeyDelay_);
         if (c != -1)
             c = c % 256;
@@ -528,11 +541,7 @@ namespace darknet_ros {
 
         IplImage *ROS_img = getIplImage();
         buff_[0] = ipl_to_image(ROS_img);
-        buff_[1] = copy_image(buff_[0]);
-        buff_[2] = copy_image(buff_[0]);
         buffLetter_[0] = letterbox_image(buff_[0], net_.w, net_.h);
-        buffLetter_[1] = letterbox_image(buff_[0], net_.w, net_.h);
-        buffLetter_[2] = letterbox_image(buff_[0], net_.w, net_.h);
         ipl_ = cvCreateImage(cvSize(buff_[0].w, buff_[0].h), IPL_DEPTH_8U, buff_[0].c);
 
         int count = 0;
@@ -557,6 +566,10 @@ namespace darknet_ros {
 
             cv::Mat cvImage = cv::cvarrToMat(ipl_);
 
+            delete(trackers_);
+            trackers_ = new MultiTracker();
+//            trackers_->clear();
+
             if (!demoPrefix_) {
                 if (count % (demoDelay_ + 1) == 0) {
                     fps_ = 1. / (getWallTime() - demoTime_);
@@ -574,35 +587,46 @@ namespace darknet_ros {
                 int num = roiBoxes_[0].num;
                 if (num > 0 && num <= 100) {
                     // container of the tracked objects
-                    ROS_INFO("clear trackers");
-                    tracker_.clear();
                     std::vector<Rect2d> objects;
                     std::vector<Ptr<Tracker> > algorithms;
 
 
                     for (int i = 0; i < num; i++) {
                         boxes.push_back(roiBoxes_[i]);
-                        algorithms.push_back(cv::TrackerMOSSE::create());
-                        auto x = int((roiBoxes_[i].x - roiBoxes_[i].w / 2) * frameWidth_);
-                        auto y = int((roiBoxes_[i].y - roiBoxes_[i].h / 2) * frameHeight_);
+                        algorithms.emplace_back(cv::TrackerMOSSE::create());
+                        auto x = int((roiBoxes_[i].x) * frameWidth_);
+                        auto y = int((roiBoxes_[i].y) * frameHeight_);
                         auto w = int(roiBoxes_[i].w * frameWidth_);
                         auto h = int(roiBoxes_[i].h * frameHeight_);
                         cv::Rect2d rr(x, y, w, h);
                         objects.push_back(rr);
                     }
-                    std::cout << objects[0];
-                    ROS_INFO("add trackers");
-                    tracker_.add(algorithms, cvImage, objects);
+                    for (auto & obj : objects)
+                        std::cout << obj << "\n";
+
+
+                    try {
+                        if (trackers_ != nullptr)
+                            if (objects.size() != 0)
+                                trackers_->add(algorithms, cvImage, objects);
+
+                    } catch (cv::Exception &e) {
+                        ROS_ERROR("cv exception: %s", e.what());
+                        return;
+                    }
                     ROS_INFO("trackers added");
                 }
-                publishInThread(cvImage, boxes);
+
+
+                if (trackers_ != nullptr)
+                    std::cout << "\n There are " << trackers_->getObjects().size() << "tracked objects\n";
+
+//                publishInThread(cvImage, boxes);
             } else {
                 char name[256];
                 sprintf(name, "%s_%08d", demoPrefix_, count);
-                save_image(buff_[(buffIndex_ + 1) % 3], name);
+                save_image(buff_[0], name);
             }
-
-
 
             fetch_thread.join();
             detect_thread.join();
@@ -665,7 +689,6 @@ namespace darknet_ros {
                 for (int j = 0; j < numClasses_; j++) {
                     if (box.Class == j) {
                         rosBoxes_[j].push_back(box);
-                        rosBoxCounter_[j]++;
                     }
                 }
             }
@@ -678,19 +701,20 @@ namespace darknet_ros {
             // Fill the 2D bounding boxes list
             frameToBoxForm.request.boundingBoxes2D.header = depthImage->header;
             for (int i = 0; i < numClasses_; i++) {
-                if (rosBoxCounter_[i] > 0) {
+                if (rosBoxes_[i].size() > 0) {
                     sara_msgs::BoundingBox2D boundingBox2D;
                     sara_msgs::BoundingBox3D boundingBox3D;
 
-                    for (int j = 0; j < rosBoxCounter_[i]; j++) {
-                        auto xmin = int((rosBoxes_[i][j].x - rosBoxes_[i][j].w / 2) * frameWidth_);
-                        auto ymin = int((rosBoxes_[i][j].y - rosBoxes_[i][j].h / 2) * frameHeight_);
-                        auto xmax = int((rosBoxes_[i][j].x + rosBoxes_[i][j].w / 2) * frameWidth_);
-                        auto ymax = int((rosBoxes_[i][j].y + rosBoxes_[i][j].h / 2) * frameHeight_);
+
+                    for (auto &box : rosBoxes_[i]) {
+                        auto xmin = int((box.x - box.w / 2) * frameWidth_);
+                        auto ymin = int((box.y - box.h / 2) * frameHeight_);
+                        auto xmax = int((box.x + box.w / 2) * frameWidth_);
+                        auto ymax = int((box.y + box.h / 2) * frameHeight_);
 
                         // Filling 2D bounding boxes
                         boundingBox2D.Class = classLabels_[i];
-                        boundingBox2D.probability = rosBoxes_[i][j].prob;
+                        boundingBox2D.probability = box.prob;
                         boundingBox2D.xmin = xmin;
                         boundingBox2D.ymin = ymin;
                         boundingBox2D.xmax = xmax;
@@ -733,7 +757,6 @@ namespace darknet_ros {
         frameToBoxForm.request.boundingBoxes2D.boundingBoxes.clear();
         for (int i = 0; i < numClasses_; i++) {
             rosBoxes_[i].clear();
-            rosBoxCounter_[i] = 0;
         }
 
         return 0;

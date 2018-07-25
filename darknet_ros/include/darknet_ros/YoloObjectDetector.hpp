@@ -252,7 +252,7 @@ namespace darknet_ros {
 
         void *publishInThread(cv::Mat cvImage, std::vector<RosBox_> roiBoxes_);
 
-        cv::MultiTracker tracker_;
+        cv::MultiTracker * trackers_{nullptr};
     };
 
 } /* namespace darknet_ros*/
