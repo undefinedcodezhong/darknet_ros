@@ -184,6 +184,7 @@ namespace darknet_ros {
         int buffId_[3];
         int buffIndex_ = 0;
         IplImage *ipl_;
+        cv::Mat Image;
         float fps_ = 0;
         float demoThresh_ = 0;
         float demoHier_ = .5;

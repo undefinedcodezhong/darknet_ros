@@ -215,6 +215,7 @@ namespace darknet_ros {
         ROS_DEBUG("[YoloObjectDetector] USB image received.");
         try {
             cam_image = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+            Image = cam_image->image;
         } catch (cv_bridge::Exception &e) {
             ROS_ERROR("cv_bridge exception: %s", e.what());
             return;
@@ -223,7 +224,7 @@ namespace darknet_ros {
         if (trackers_ != nullptr){
             try {
                 ROS_INFO("update trackers");
-                trackers_->update(cam_image->image);
+                trackers_->update(Image);
             }
             catch (cv::Exception &e) {
                 ROS_ERROR("cv exception: %s", e.what());
@@ -231,18 +232,19 @@ namespace darknet_ros {
             }
 
             std::vector<RosBox_> boxes;
-            for (auto &box : trackers_->getObjects()) {
+            auto objs = trackers_->getObjects();
+            for (auto &box : objs) {
                 std::cout << "\n" << box;
 
-                auto xmin = box.x / frameWidth_;
-                auto ymin = box.y / frameHeight_;
-                auto xmax = box.width / frameWidth_;
-                auto ymax = box.width / frameHeight_;
+                auto x = (box.x) / frameWidth_;
+                auto y = (box.y) / frameHeight_;
+                auto w = box.width / frameWidth_;
+                auto h = box.height / frameHeight_;
 
-                boxes.push_back(RosBox_{xmin, ymin, xmax, ymax});
+                boxes.push_back(RosBox_{x, y, w, h});
 
             }
-            publishInThread(cam_image->image, boxes);
+            publishInThread(Image, boxes);
         }
         if (!syncRgb) {
             rgbImage = std::move(msg);
@@ -566,6 +568,11 @@ namespace darknet_ros {
 
             cv::Mat cvImage = cv::cvarrToMat(ipl_);
 
+            cv_bridge::CvImagePtr cam_image;
+            cam_image = cv_bridge::toCvCopy(rgbImage, sensor_msgs::image_encodings::BGR8);
+            Image = cam_image->image;
+
+
             delete(trackers_);
             trackers_ = new MultiTracker();
 //            trackers_->clear();
@@ -594,10 +601,10 @@ namespace darknet_ros {
                     for (int i = 0; i < num; i++) {
                         boxes.push_back(roiBoxes_[i]);
                         algorithms.emplace_back(cv::TrackerMOSSE::create());
-                        auto x = int((roiBoxes_[i].x) * frameWidth_);
-                        auto y = int((roiBoxes_[i].y) * frameHeight_);
-                        auto w = int(roiBoxes_[i].w * frameWidth_);
-                        auto h = int(roiBoxes_[i].h * frameHeight_);
+                        auto x = roiBoxes_[i].x * frameWidth_;
+                        auto y = roiBoxes_[i].y * frameHeight_;
+                        auto w = roiBoxes_[i].w * frameWidth_;
+                        auto h = roiBoxes_[i].h * frameHeight_;
                         cv::Rect2d rr(x, y, w, h);
                         objects.push_back(rr);
                     }
@@ -608,7 +615,7 @@ namespace darknet_ros {
                     try {
                         if (trackers_ != nullptr)
                             if (objects.size() != 0)
-                                trackers_->add(algorithms, cvImage, objects);
+                                trackers_->add(algorithms, Image, objects);
 
                     } catch (cv::Exception &e) {
                         ROS_ERROR("cv exception: %s", e.what());
@@ -642,7 +649,6 @@ namespace darknet_ros {
             end = std::chrono::system_clock::now();
             elapsed_time = end - start;
             std::this_thread::sleep_for(run_period - elapsed_time);  // Sleep a bit so you don't kill my GPU!
-
 
         }
 
