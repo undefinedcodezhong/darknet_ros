@@ -249,7 +249,7 @@ namespace darknet_ros {
 
         bool isNodeRunning(void);
 
-        void *publishInThread(cv::Mat cvImage, std::vector<RosBox_> roiBoxes_);
+        void *publishInThread(std::vector<RosBox_> Boxes_);
 
         cv::MultiTracker * trackers_{nullptr};
     };
