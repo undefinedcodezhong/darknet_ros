@@ -179,10 +179,9 @@ namespace darknet_ros {
         float **probs_;
         box *boxes_;
         network net_;
-        image buff_[3];
-        image buffLetter_[3];
-        int buffId_[3];
-        int buffIndex_ = 0;
+        image buff_;
+        image buffLetter_;
+        int buffId_;
         IplImage *ipl_;
         float fps_ = 0;
         float demoThresh_ = 0;
@@ -190,7 +189,7 @@ namespace darknet_ros {
         int running_ = 0;
 
         int demoDelay_ = 0;
-        int demoFrame_ = 3;
+        int demoFrame_ = 0;
         int demoDetections_ = 0;
         float **predictions_;
         int demoIndex_ = 0;

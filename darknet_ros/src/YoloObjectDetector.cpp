@@ -287,6 +287,8 @@ namespace darknet_ros {
                 }
                 frameWidth_ = cam_image->image.size().width;
                 frameHeight_ = cam_image->image.size().height;
+
+
                 syncRgb = true;
             }
             {
@@ -397,13 +399,10 @@ namespace darknet_ros {
 
     void *YoloObjectDetector::fetchInThread() {
         IplImage *ROS_img = getIplImage();
-        ipl_into_image(ROS_img, buff_[0]);
-        {
-            boost::shared_lock<boost::shared_mutex> lock(mutexImageCallback_);
-            buffId_[buffIndex_] = actionId_;
-        }
-        rgbgr_image(buff_[0]);
-        letterbox_image_into(buff_[0], net_.w, net_.h, buffLetter_[0]);
+        ipl_into_image(ROS_img, buff_);
+
+        rgbgr_image(buff_);
+        letterbox_image_into(buff_, net_.w, net_.h, buffLetter_);
         return 0;
     }
 
@@ -414,7 +413,7 @@ namespace darknet_ros {
         float nms = .4;
 
         layer l = net_.layers[net_.n - 1];
-        float *X = buffLetter_[0].data;
+        float *X = buffLetter_.data;
         float *prediction = network_predict(net_, X);
 
         memcpy(predictions_[demoIndex_], prediction, l.outputs * sizeof(float));
@@ -425,7 +424,7 @@ namespace darknet_ros {
         if (l.type == DETECTION) {
             get_detection_boxes(l, 1, 1, demoThresh_, probs_, boxes_, 0);
         } else if (l.type == REGION) {
-            get_region_boxes(l, buff_[0].w, buff_[0].h, net_.w, net_.h, demoThresh_, probs_, boxes_, 0, 0,
+            get_region_boxes(l, buff_.w, buff_.h, net_.w, net_.h, demoThresh_, probs_, boxes_, 0, 0,
                              demoHier_, 1);
         } else {
             error("Last layer must produce detections\n");
@@ -437,7 +436,7 @@ namespace darknet_ros {
             printf("\nFPS:%.1f\n", fps_);
             printf("Objects:\n\n");
         }
-        image display = buff_[0];
+        image display = buff_;
         draw_detections(display, demoDetections_, demoThresh_, boxes_, probs_, demoNames_, demoAlphabet_,
                         demoClasses_);
 
@@ -503,7 +502,7 @@ namespace darknet_ros {
     }
 
     void *YoloObjectDetector::displayInThread(void *ptr) {
-        show_image_cv(buff_[0], "Demo", ipl_);
+        show_image_cv(buff_, "Demo", ipl_);
         int c = cvWaitKey(waitKeyDelay_);
         if (c != -1)
             c = c % 256;
@@ -535,17 +534,7 @@ namespace darknet_ros {
         return 0;
     }
 
-    void *YoloObjectDetector::displayLoop(void *ptr) {
-        while (1) {
-            displayInThread(0);
-        }
-    }
 
-    void *YoloObjectDetector::detectLoop(void *ptr) {
-        while (1) {
-            detectInThread();
-        }
-    }
 
     void YoloObjectDetector::setupNetwork(char *cfgfile, char *weightfile, char *datafile, float thresh,
                                           char **names, int classes,
@@ -602,9 +591,9 @@ namespace darknet_ros {
             probs_[j] = (float *) calloc(l.classes + 1, sizeof(float));
 
         IplImage *ROS_img = getIplImage();
-        buff_[0] = ipl_to_image(ROS_img);
-        buffLetter_[0] = letterbox_image(buff_[0], net_.w, net_.h);
-        ipl_ = cvCreateImage(cvSize(buff_[0].w, buff_[0].h), IPL_DEPTH_8U, buff_[0].c);
+        buff_ = ipl_to_image(ROS_img);
+        buffLetter_ = letterbox_image(buff_, net_.w, net_.h);
+        ipl_ = cvCreateImage(cvSize(buff_.w, buff_.h), IPL_DEPTH_8U, buff_.c);
 
         int count = 0;
 
@@ -621,57 +610,61 @@ namespace darknet_ros {
         demoTime_ = getWallTime();
 
         while (!demoDone_) {
+
+            // wait for sync
+            while (!syncRgb) std::this_thread::sleep_for(std::chrono::duration<double>{1});
+
+
+            YoloObjectDetector::fetchInThread();
+
+            YoloObjectDetector::detectInThread();
+
+
+
+
             std::chrono::time_point<std::chrono::system_clock> start = std::chrono::system_clock::now();
-
-
-            buffIndex_ = (buffIndex_ + 1) % 3;
-            fetch_thread = std::thread(&YoloObjectDetector::fetchInThread, this);
-            detect_thread = std::thread(&YoloObjectDetector::detectInThread, this);
 
             cv::Mat cvImage = cv::cvarrToMat(ipl_);
 
-            if (!demoPrefix_) {
-                if (count % (demoDelay_ + 1) == 0) {
-                    fps_ = 1. / (getWallTime() - demoTime_);
-                    demoTime_ = getWallTime();
-                    float *swap = lastAvg_;
-                    lastAvg_ = lastAvg2_;
-                    lastAvg2_ = swap;
-                    memcpy(lastAvg_, avg_, l.outputs * sizeof(float));
-                }
-                if (viewImage_) {
-                    displayInThread(0);
-                }
+            fps_ = 1. / (getWallTime() - demoTime_);
+            demoTime_ = getWallTime();
+            float *swap = lastAvg_;
+            lastAvg_ = lastAvg2_;
+            lastAvg2_ = swap;
+            memcpy(lastAvg_, avg_, l.outputs * sizeof(float));
+            if (viewImage_) {
+                displayInThread(0);
+            }
 
-                std::vector<RosBox_> Boxes;
-                int num = roiBoxes_[0].num;
-                if (num > 0 && num <= 100) {
-                    for (int i = 0; i < num; i++) {
-                        for (int j = 0; j < numClasses_; j++) {
-                            if (roiBoxes_[i].Class == j) {
-                                Boxes.push_back(roiBoxes_[i]);
-                            }
+            std::vector<RosBox_> Boxes;
+            int num = roiBoxes_[0].num;
+            if (num > 0 && num <= 100) {
+                for (int i = 0; i < num; i++) {
+                    for (int j = 0; j < numClasses_; j++) {
+                        if (roiBoxes_[i].Class == j) {
+                            Boxes.push_back(roiBoxes_[i]);
                         }
                     }
                 }
-                publishInThread(Boxes);
-            } else {
-                char name[256];
-                sprintf(name, "%s_%08d", demoPrefix_, count);
-                save_image(buff_[(buffIndex_ + 1) % 3], name);
             }
-            fetch_thread.join();
-            detect_thread.join();
-            ++count;
+            publishInThread(Boxes);
+
             if (!isNodeRunning()) {
                 demoDone_ = true;
             }
-            syncRgb = false;
             std::chrono::time_point<std::chrono::system_clock> end = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed_time = end - start;
             end = std::chrono::system_clock::now();
             elapsed_time = end - start;
             std::this_thread::sleep_for(run_period - elapsed_time);  // Sleep a bit so you don't kill my GPU!
+
+
+
+
+
+
+
+            syncRgb = false;
         }
 
     }
@@ -768,7 +761,7 @@ namespace darknet_ros {
         if (isCheckingForObjects()) {
             ROS_DEBUG("[YoloObjectDetector] check for objects in image.");
             darknet_ros_msgs::CheckForObjectsResult objectsActionResult;
-            objectsActionResult.id = buffId_[0];
+            objectsActionResult.id = buffId_;
             objectsActionResult.boundingBoxes = frameToBoxForm.request.boundingBoxes2D;
             checkForObjectsActionServer_->setSucceeded(objectsActionResult, "Send bounding boxes.");
         }
