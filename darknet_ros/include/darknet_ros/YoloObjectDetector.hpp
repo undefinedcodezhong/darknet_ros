@@ -25,6 +25,9 @@
 #include <sensor_msgs/Image.h>
 #include <geometry_msgs/Point.h>
 #include <image_transport/image_transport.h>
+#include <message_filters/subscriber.h>
+#include <message_filters/synchronizer.h>
+#include <message_filters/sync_policies/approximate_time.h>
 
 // OpenCv
 #include <opencv2/imgproc/imgproc.hpp>
@@ -98,26 +101,10 @@ class YoloObjectDetector
 
   /*!
    * Callback of camera.
-   * @param[in] msg image pointer.
+   * @param[in] rgbImage image pointer.
+   * @param[in] depthImage image pointer.
    */
-  void cameraCallback(const sensor_msgs::ImageConstPtr& msg);
-  void cameraDepthCallback(const sensor_msgs::ImageConstPtr& msg);
-
-  /*!
-   * Check for objects action goal callback.
-   */
-  void checkForObjectsActionGoalCB();
-
-  /*!
-   * Check for objects action preempt callback.
-   */
-  void checkForObjectsActionPreemptCB();
-
-  /*!
-   * Check if a preempt for the check for objects action has been requested.
-   * @return false if preempt has been requested or inactive.
-   */
-  bool isCheckingForObjects() const;
+  void cameraCallback(const sensor_msgs::ImageConstPtr& rgbImageMsg, const sensor_msgs::ImageConstPtr& depthImageMsg);
 
   /*!
    * Publishes the detection image.
@@ -128,6 +115,7 @@ class YoloObjectDetector
   //! Typedefs.
   typedef actionlib::SimpleActionServer<darknet_ros_msgs::CheckForObjectsAction> CheckForObjectsActionServer;
   typedef std::shared_ptr<CheckForObjectsActionServer> CheckForObjectsActionServerPtr;
+  typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> MySyncPolicy;
 
   //! ROS node handle.
   ros::NodeHandle nodeHandle_;
@@ -136,15 +124,9 @@ class YoloObjectDetector
   int numClasses_;
   std::vector<std::string> classLabels_;
 
-  //! Check for objects action server.
-  CheckForObjectsActionServerPtr checkForObjectsActionServer_;
-
   //! Advertise and subscribe to image topics.
   image_transport::ImageTransport imageTransport_;
 
-  //! ROS subscriber and publisher.
-  image_transport::Subscriber imageSubscriber_;
-  image_transport::Subscriber imageDepthSubscriber_;
   ros::Publisher objectPublisher_;
   ros::Publisher boundingBoxes2DPublisher_;
   ros::Publisher boundingBoxes3DPublisher_;
@@ -204,11 +186,10 @@ class YoloObjectDetector
   int waitKeyDelay_;
   int fullScreen_;
   char *demoPrefix_;
-  bool syncRgb;
-  bool syncDepth;
+  bool syncImage;
   bool publishSyncEnable;
 
-    sensor_msgs::ImageConstPtr rgbImage;
+  sensor_msgs::ImageConstPtr rgbImage;
   sensor_msgs::ImageConstPtr depthImage;
 
   cv::Mat camImageCopy_;
