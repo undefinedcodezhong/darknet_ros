@@ -185,8 +185,10 @@ void YoloObjectDetector::init()
 
   // ApproximateTime takes a queue size as its constructor argument, hence MySyncPolicy(10)
   message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), imageSubscriber_, imageDepthSubscriber_);
-  sync.registerCallback(boost::bind(&YoloObjectDetector::cameraCallback, this, _1, _2));
-
+// https://answers.ros.org/question/9705/synchronizer-and-image_transportsubscriber/
+//  boost::function<void (sensor_msgs::ImageConstPtr, sensor_msgs::ImageConstPtr)> Fun( boost::bind(&YoloObjectDetector::cameraCallback, this, _1, _2) );
+  sync.registerCallback( boost::bind(&YoloObjectDetector::cameraCallback, this, _1, _2) );
+//    boost::function<void (int)>    f1( boost::bind( &YoloObjectDetector::cameraCallback, this , _1) );
 
   objectPublisher_ = nodeHandle_.advertise<std_msgs::Int8>(objectDetectorTopicName,
                                                            objectDetectorQueueSize,
@@ -220,6 +222,7 @@ void YoloObjectDetector::cameraCallback(const sensor_msgs::ImageConstPtr& rgbIma
       syncImage = true;
     }
   }
+  std::cout << "reception";
 
   cv_bridge::CvImagePtr cam_image;
 
