@@ -192,6 +192,10 @@ class YoloObjectDetector
 
   sensor_msgs::ImageConstPtr rgbImage;
   sensor_msgs::ImageConstPtr depthImage;
+  sensor_msgs::ImageConstPtr rgbImage2;
+  sensor_msgs::ImageConstPtr depthImage2;
+  sensor_msgs::ImageConstPtr rgbImage3;
+  sensor_msgs::ImageConstPtr depthImage3;
 
   cv::Mat camImageCopy_;
   boost::shared_mutex mutexImageCallback_;

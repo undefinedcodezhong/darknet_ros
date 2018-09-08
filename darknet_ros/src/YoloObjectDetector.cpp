@@ -212,8 +212,16 @@ void YoloObjectDetector::cameraCallback(const sensor_msgs::ImageConstPtr& rgbIma
   if (!syncImage) {
     {
       boost::unique_lock<boost::shared_mutex> lockImageCallback(mutexImageCallback_);
-      rgbImage = std::move(rgbImageMsg);
-      depthImage = std::move(depthImageMsg);
+      if (rgbImage2 != nullptr) {
+        rgbImage = std::move(rgbImage2);
+        depthImage = std::move(depthImage2);
+      } else {
+        rgbImage = std::move(rgbImageMsg);
+        depthImage = std::move(depthImageMsg);
+      }
+
+      rgbImage2 = std::move(rgbImageMsg);
+      depthImage2 = std::move(depthImageMsg);
       syncImage = true;
     }
   }
@@ -222,7 +230,7 @@ void YoloObjectDetector::cameraCallback(const sensor_msgs::ImageConstPtr& rgbIma
   cv_bridge::CvImagePtr cam_image;
 
   try {
-    cam_image = cv_bridge::toCvCopy(rgbImage, sensor_msgs::image_encodings::BGR8);
+    cam_image = cv_bridge::toCvCopy(rgbImageMsg, sensor_msgs::image_encodings::BGR8);
   } catch (cv_bridge::Exception& e) {
     ROS_ERROR("cv_bridge exception: %s", e.what());
     return;
@@ -352,6 +360,7 @@ void *YoloObjectDetector::detectInThread()
         }
       }
     }
+    syncImage = false;
   }
 
   // create array to store found bounding boxes
