@@ -25,6 +25,7 @@
 #include <sensor_msgs/Image.h>
 #include <geometry_msgs/Point.h>
 #include <image_transport/image_transport.h>
+#include <image_transport/subscriber_filter.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
@@ -80,7 +81,7 @@ class YoloObjectDetector
   /*!
    * Constructor.
    */
-  explicit YoloObjectDetector(ros::NodeHandle nh);
+  explicit YoloObjectDetector(ros::NodeHandle nh, std::string cameraTopicName, std::string cameraDepthTopicName);
 
   /*!
    * Destructor.
@@ -116,7 +117,7 @@ class YoloObjectDetector
   typedef actionlib::SimpleActionServer<darknet_ros_msgs::CheckForObjectsAction> CheckForObjectsActionServer;
   typedef std::shared_ptr<CheckForObjectsActionServer> CheckForObjectsActionServerPtr;
   typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> MySyncPolicy;
-
+  typedef image_transport::SubscriberFilter ImageSubscriber;
   //! ROS node handle.
   ros::NodeHandle nodeHandle_;
 
@@ -203,6 +204,11 @@ class YoloObjectDetector
 
   int actionId_;
   boost::shared_mutex mutexActionStatus_;
+
+
+  ImageSubscriber imageSubscriber_;
+  ImageSubscriber imageDepthSubscriber_;
+  message_filters::Synchronizer<MySyncPolicy> sync;
 
   double getWallTime();
 

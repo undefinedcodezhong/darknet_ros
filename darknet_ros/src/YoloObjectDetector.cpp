@@ -25,13 +25,16 @@ char *weights;
 char *data;
 char **detectionNames;
 
-YoloObjectDetector::YoloObjectDetector(ros::NodeHandle nh)
+YoloObjectDetector::YoloObjectDetector(ros::NodeHandle nh, std::string cameraTopicName, std::string cameraDepthTopicName)
     : nodeHandle_(nh),
       imageTransport_(nodeHandle_),
       numClasses_(0),
       classLabels_(0),
       rosBoxes_(0),
-      rosBoxCounter_(0)
+      rosBoxCounter_(0),
+      imageSubscriber_(imageTransport_, cameraTopicName, 1),
+      imageDepthSubscriber_(imageTransport_, cameraDepthTopicName, 1),
+      sync(MySyncPolicy(10), imageSubscriber_, imageDepthSubscriber_)
 {
   ROS_INFO("[YoloObjectDetector] Node started.");
 
@@ -152,11 +155,7 @@ void YoloObjectDetector::init()
   run_period = std::chrono::duration<double>(1.0/rate);
 
   nodeHandle_.param("subscribers/camera_reading/queue_size", cameraQueueSize, 1);
-  nodeHandle_.param("subscribers/camera_reading/topic", cameraTopicName,
-                    std::string("/camera/rgb/image_raw"));
   nodeHandle_.param("subscribers/camera_depth_reading/queue_size", cameraQueueSize, 1);
-  nodeHandle_.param("subscribers/camera_depth_reading/topic", cameraDepthTopicName,
-                    std::string("/camera/depth/image_raw"));
   nodeHandle_.param("publishers/camera_sync/rgb_topic", cameraSyncTopicName,
                     std::string("/sync/rgb/image"));
   nodeHandle_.param("publishers/camera_sync/depth_topic", cameraDepthSyncTopicName,
@@ -180,15 +179,11 @@ void YoloObjectDetector::init()
   nodeHandle_.param("publishers/detection_image/latch", detectionImageLatch, true);
 
 
-  message_filters::Subscriber<sensor_msgs::Image> imageSubscriber_(nodeHandle_, cameraTopicName, 1);
-  message_filters::Subscriber<sensor_msgs::Image> imageDepthSubscriber_(nodeHandle_, cameraDepthTopicName, 1);
 
   // ApproximateTime takes a queue size as its constructor argument, hence MySyncPolicy(10)
-  message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), imageSubscriber_, imageDepthSubscriber_);
+
 // https://answers.ros.org/question/9705/synchronizer-and-image_transportsubscriber/
-//  boost::function<void (sensor_msgs::ImageConstPtr, sensor_msgs::ImageConstPtr)> Fun( boost::bind(&YoloObjectDetector::cameraCallback, this, _1, _2) );
   sync.registerCallback( boost::bind(&YoloObjectDetector::cameraCallback, this, _1, _2) );
-//    boost::function<void (int)>    f1( boost::bind( &YoloObjectDetector::cameraCallback, this , _1) );
 
   objectPublisher_ = nodeHandle_.advertise<std_msgs::Int8>(objectDetectorTopicName,
                                                            objectDetectorQueueSize,
