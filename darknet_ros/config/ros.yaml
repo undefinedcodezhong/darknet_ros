@@ -4,11 +4,11 @@ frame_rate: 6
 subscribers:
 
   camera_reading:
-    topic: /head_xtion/rgb/image_raw
+    topic: /camera/rgb/image_raw
     queue_size: 1
 
   camera_depth_reading:
-    topic: /head_xtion/depth/image_raw
+    topic: /camera/depth/image_raw
     queue_size: 1
 
 actions:
@@ -23,8 +23,13 @@ publishers:
     queue_size: 1
     latch: false
 
-  bounding_boxes:
-    topic: /darknet_ros/bounding_boxes
+  bounding_boxes2D:
+    topic: /darknet_ros/bounding_boxes2D
+    queue_size: 1
+    latch: false
+
+  bounding_boxes3D:
+    topic: /darknet_ros/bounding_boxes3D
     queue_size: 1
     latch: false
 
@@ -34,6 +39,7 @@ publishers:
     latch: false
 
   camera_sync:
+    enable: true
     rgb_topic: /darknet_ros/sync/rgb/image
     depth_topic: /darknet_ros/sync/depth/image
 

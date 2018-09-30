@@ -32,11 +32,13 @@
 #include <opencv2/objdetect/objdetect.hpp>
 #include <cv_bridge/cv_bridge.h>
 
-// darknet_ros_msgs
-#include <darknet_ros_msgs/BoundingBoxes.h>
-#include <darknet_ros_msgs/BoundingBox.h>
+// ros_msgs
+#include <sara_msgs/BoundingBoxes2D.h>
+#include <sara_msgs/BoundingBox2D.h>
+#include <sara_msgs/BoundingBoxes3D.h>
+#include <sara_msgs/BoundingBox3D.h>
 #include <darknet_ros_msgs/CheckForObjectsAction.h>
-
+#include <wm_frame_to_box/GetBoundingBoxes3D.h>
 // Darknet.
 #ifdef GPU
 #include "cuda_runtime.h"
@@ -144,14 +146,14 @@ class YoloObjectDetector
   image_transport::Subscriber imageSubscriber_;
   image_transport::Subscriber imageDepthSubscriber_;
   ros::Publisher objectPublisher_;
-  ros::Publisher boundingBoxesPublisher_;
+  ros::Publisher boundingBoxes2DPublisher_;
+  ros::Publisher boundingBoxes3DPublisher_;
   image_transport::Publisher rgbPublisher_;
   image_transport::Publisher depthPublisher_;
 
   //! Detected objects.
   std::vector<std::vector<RosBox_> > rosBoxes_;
   std::vector<int> rosBoxCounter_;
-  darknet_ros_msgs::BoundingBoxes boundingBoxesResults_;
 
   //! Camera related parameters.
   int frameWidth_;
@@ -159,6 +161,10 @@ class YoloObjectDetector
 
   //! Publisher of the bounding box image.
   image_transport::Publisher detectionImagePublisher_;
+
+  //! Frame_to_box client
+  ros::ServiceClient frameToBoxClient;
+  wm_frame_to_box::GetBoundingBoxes3D frameToBoxForm;
 
   // Yolo running on thread.
   std::thread yoloThread_;
@@ -200,8 +206,9 @@ class YoloObjectDetector
   char *demoPrefix_;
   bool syncRgb;
   bool syncDepth;
+  bool publishSyncEnable;
 
-  sensor_msgs::ImageConstPtr rgbImage;
+    sensor_msgs::ImageConstPtr rgbImage;
   sensor_msgs::ImageConstPtr depthImage;
 
   cv::Mat camImageCopy_;

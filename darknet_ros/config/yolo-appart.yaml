@@ -1,0 +1,30 @@
+yolo_model:
+
+  config_file:
+    name: yolo-appart.cfg
+  weight_file:
+    name: yolo-appart.weights
+  threshold:
+    value: 0.2
+  detection_classes:
+    names:
+      - maxwell
+      - coffee
+      - cookies
+      - mcdonald
+      - mushrooms
+      - pringles
+      - shampoo
+      - tooth paste
+      - sponge
+      - soap
+      - water
+      - juice
+      - moutain dew
+      - coke
+      - pear
+      - milk
+      - apple
+      - lemon
+      - kinder surprise
+

@@ -135,15 +135,19 @@ void YoloObjectDetector::init()
   std::string objectDetectorTopicName;
   int objectDetectorQueueSize;
   bool objectDetectorLatch;
-  std::string boundingBoxesTopicName;
-  int boundingBoxesQueueSize;
-  bool boundingBoxesLatch;
+  std::string boundingBoxes2DTopicName;
+  int boundingBoxes2DQueueSize;
+  bool boundingBoxes2DLatch;
+  std::string boundingBoxes3DTopicName;
+  int boundingBoxes3DQueueSize;
+  bool boundingBoxes3DLatch;
   std::string detectionImageTopicName;
   int detectionImageQueueSize;
   bool detectionImageLatch;
   int rate;
   syncDepth = false;
   syncRgb = false;
+  publishSyncEnable = false;
 
   nodeHandle_.param("frame_rate", rate, 2);
   run_period = std::chrono::duration<double>(1.0/rate);
@@ -158,14 +162,19 @@ void YoloObjectDetector::init()
                     std::string("/sync/rgb/image"));
   nodeHandle_.param("publishers/camera_sync/depth_topic", cameraDepthSyncTopicName,
                     std::string("/sync/depth/image"));
+  nodeHandle_.param("publishers/camera_sync/enable", publishSyncEnable, false);
   nodeHandle_.param("publishers/object_detector/topic", objectDetectorTopicName,
                     std::string("found_object"));
   nodeHandle_.param("publishers/object_detector/queue_size", objectDetectorQueueSize, 1);
   nodeHandle_.param("publishers/object_detector/latch", objectDetectorLatch, false);
-  nodeHandle_.param("publishers/bounding_boxes/topic", boundingBoxesTopicName,
+  nodeHandle_.param("publishers/bounding_boxes2D/topic", boundingBoxes2DTopicName,
                     std::string("bounding_boxes"));
-  nodeHandle_.param("publishers/bounding_boxes/queue_size", boundingBoxesQueueSize, 1);
-  nodeHandle_.param("publishers/bounding_boxes/latch", boundingBoxesLatch, false);
+  nodeHandle_.param("publishers/bounding_boxes2D/queue_size", boundingBoxes2DQueueSize, 1);
+  nodeHandle_.param("publishers/bounding_boxes_2d/latch", boundingBoxes2DLatch, false);
+  nodeHandle_.param("publishers/bounding_boxes3D/topic", boundingBoxes3DTopicName,
+                    std::string("bounding_boxes_3d"));
+  nodeHandle_.param("publishers/bounding_boxes3D/queue_size", boundingBoxes3DQueueSize, 1);
+  nodeHandle_.param("publishers/bounding_boxes3D/latch", boundingBoxes3DLatch, false);
   nodeHandle_.param("publishers/detection_image/topic", detectionImageTopicName,
                     std::string("detection_image"));
   nodeHandle_.param("publishers/detection_image/queue_size", detectionImageQueueSize, 1);
@@ -179,8 +188,11 @@ void YoloObjectDetector::init()
   objectPublisher_ = nodeHandle_.advertise<std_msgs::Int8>(objectDetectorTopicName,
                                                            objectDetectorQueueSize,
                                                            objectDetectorLatch);
-  boundingBoxesPublisher_ = nodeHandle_.advertise<darknet_ros_msgs::BoundingBoxes>(
-  boundingBoxesTopicName, boundingBoxesQueueSize, boundingBoxesLatch);
+  boundingBoxes2DPublisher_ = nodeHandle_.advertise<sara_msgs::BoundingBoxes2D>(
+          boundingBoxes2DTopicName, boundingBoxes2DQueueSize, boundingBoxes2DLatch);
+  boundingBoxes3DPublisher_ = nodeHandle_.advertise<sara_msgs::BoundingBoxes3D>(
+          boundingBoxes3DTopicName, boundingBoxes2DQueueSize, boundingBoxes3DLatch);
+  frameToBoxClient = nodeHandle_.serviceClient<wm_frame_to_box::GetBoundingBoxes3D>("/get_3d_bounding_boxes");
 
 
   rgbPublisher_ = imageTransport_.advertise(cameraSyncTopicName, 5);
@@ -188,10 +200,6 @@ void YoloObjectDetector::init()
   detectionImagePublisher_ = imageTransport_.advertise(detectionImageTopicName,
                                                          detectionImageQueueSize,
                                                          detectionImageLatch);
-
-  boundingBoxesPublisher_ = nodeHandle_.advertise<darknet_ros_msgs::BoundingBoxes>(
-          boundingBoxesTopicName, boundingBoxesQueueSize, boundingBoxesLatch);
-
   // Action servers.
   std::string checkForObjectsActionName;
   nodeHandle_.param("actions/camera_reading/topic", checkForObjectsActionName,
@@ -609,15 +617,13 @@ void *YoloObjectDetector::publishInThread()
 {
 
   if (syncDepth) {
-    depthPublisher_.publish(depthImage);
+    if (publishSyncEnable) depthPublisher_.publish(depthImage);
     syncDepth = false;
   }
   if (syncRgb) {
-    rgbPublisher_.publish(rgbImage);
+    if (publishSyncEnable) rgbPublisher_.publish(rgbImage);
     syncRgb = false;
   }
-
-
 
   // Publish image.
   cv::Mat cvImage = cv::cvarrToMat(ipl_);
@@ -641,30 +647,44 @@ void *YoloObjectDetector::publishInThread()
     msg.data = num;
     objectPublisher_.publish(msg);
 
+    // Fill the 2D bounding boxes list
+    frameToBoxForm.request.boundingBoxes2D.header = depthImage->header;
     for (int i = 0; i < numClasses_; i++) {
       if (rosBoxCounter_[i] > 0) {
-        darknet_ros_msgs::BoundingBox boundingBox;
+        sara_msgs::BoundingBox2D boundingBox2D;
+        sara_msgs::BoundingBox3D boundingBox3D;
 
         for (int j = 0; j < rosBoxCounter_[i]; j++) {
-          int xmin = (rosBoxes_[i][j].x - rosBoxes_[i][j].w / 2) * frameWidth_;
-          int ymin = (rosBoxes_[i][j].y - rosBoxes_[i][j].h / 2) * frameHeight_;
-          int xmax = (rosBoxes_[i][j].x + rosBoxes_[i][j].w / 2) * frameWidth_;
-          int ymax = (rosBoxes_[i][j].y + rosBoxes_[i][j].h / 2) * frameHeight_;
+          auto xmin = int((rosBoxes_[i][j].x - rosBoxes_[i][j].w / 2) * frameWidth_);
+          auto ymin = int((rosBoxes_[i][j].y - rosBoxes_[i][j].h / 2) * frameHeight_);
+          auto xmax = int((rosBoxes_[i][j].x + rosBoxes_[i][j].w / 2) * frameWidth_);
+          auto ymax = int((rosBoxes_[i][j].y + rosBoxes_[i][j].h / 2) * frameHeight_);
 
-          boundingBox.Class = classLabels_[i];
-          boundingBox.probability = rosBoxes_[i][j].prob;
-          boundingBox.xmin = xmin;
-          boundingBox.ymin = ymin;
-          boundingBox.xmax = xmax;
-          boundingBox.ymax = ymax;
-          boundingBoxesResults_.boundingBoxes.push_back(boundingBox);
+          // Filling 2D bounding boxes
+          boundingBox2D.Class = classLabels_[i];
+          boundingBox2D.probability = rosBoxes_[i][j].prob;
+          boundingBox2D.xmin = xmin;
+          boundingBox2D.ymin = ymin;
+          boundingBox2D.xmax = xmax;
+          boundingBox2D.ymax = ymax;
+          frameToBoxForm.request.boundingBoxes2D.boundingBoxes.push_back(boundingBox2D);
+
+
         }
       }
     }
 
-    boundingBoxesResults_.header.frame_id = "detection";
-    boundingBoxesPublisher_.publish(boundingBoxesResults_);
-    boundingBoxesResults_.header.stamp = ros::Time::now();
+    // Fill the 3D bounding boxes list
+    frameToBoxClient.waitForExistence();
+    frameToBoxForm.request.image = *depthImage;
+    frameToBoxForm.request.input_frame = depthImage->header.frame_id;
+    frameToBoxForm.request.output_frame = depthImage->header.frame_id;
+    frameToBoxClient.call(frameToBoxForm);
+
+    // Publish all of the bounding boxes
+    boundingBoxes2DPublisher_.publish(frameToBoxForm.request.boundingBoxes2D);
+    boundingBoxes3DPublisher_.publish(frameToBoxForm.response.boundingBoxes3D);
+
   } else {
     std_msgs::Int8 msg;
     msg.data = 0;
@@ -674,10 +694,10 @@ void *YoloObjectDetector::publishInThread()
     ROS_DEBUG("[YoloObjectDetector] check for objects in image.");
     darknet_ros_msgs::CheckForObjectsResult objectsActionResult;
     objectsActionResult.id = buffId_[0];
-    objectsActionResult.boundingBoxes = boundingBoxesResults_;
+    objectsActionResult.boundingBoxes = frameToBoxForm.request.boundingBoxes2D;
     checkForObjectsActionServer_->setSucceeded(objectsActionResult, "Send bounding boxes.");
   }
-  boundingBoxesResults_.boundingBoxes.clear();
+  frameToBoxForm.request.boundingBoxes2D.boundingBoxes.clear();
   for (int i = 0; i < numClasses_; i++) {
     rosBoxes_[i].clear();
     rosBoxCounter_[i] = 0;
