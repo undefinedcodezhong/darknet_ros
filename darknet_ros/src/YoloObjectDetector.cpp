@@ -150,7 +150,7 @@ void YoloObjectDetector::init()
   publishSyncEnable = false;
 
   nodeHandle_.param("frame_rate", rate, 2);
-  nodeHandle_.param("output_frame", _OUTPUT_FRAME, "/map");
+  nodeHandle_.param("output_frame", _OUTPUT_FRAME, std::string("/map"));
   run_period = std::chrono::duration<double>(1.0/rate);
 
   nodeHandle_.param("subscribers/camera_reading/queue_size", cameraQueueSize, 1);

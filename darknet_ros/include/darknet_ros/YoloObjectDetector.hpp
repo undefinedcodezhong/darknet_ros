@@ -207,6 +207,7 @@ class YoloObjectDetector
   bool syncRgb;
   bool syncDepth;
   bool publishSyncEnable;
+  std::string _OUTPUT_FRAME;
 
     sensor_msgs::ImageConstPtr rgbImage;
   sensor_msgs::ImageConstPtr depthImage;
