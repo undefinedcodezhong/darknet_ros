@@ -1,5 +1,6 @@
 
 frame_rate: 6
+output_frame: "/map"
 
 subscribers:
 

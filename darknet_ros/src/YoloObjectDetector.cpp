@@ -150,6 +150,7 @@ void YoloObjectDetector::init()
   publishSyncEnable = false;
 
   nodeHandle_.param("frame_rate", rate, 2);
+  nodeHandle_.param("output_frame", _OUTPUT_FRAME, "/map");
   run_period = std::chrono::duration<double>(1.0/rate);
 
   nodeHandle_.param("subscribers/camera_reading/queue_size", cameraQueueSize, 1);
@@ -678,7 +679,7 @@ void *YoloObjectDetector::publishInThread()
     frameToBoxClient.waitForExistence();
     frameToBoxForm.request.image = *depthImage;
     frameToBoxForm.request.input_frame = depthImage->header.frame_id;
-    frameToBoxForm.request.output_frame = depthImage->header.frame_id;
+    frameToBoxForm.request.output_frame = _OUTPUT_FRAME;
     frameToBoxClient.call(frameToBoxForm);
 
     // Publish all of the bounding boxes
