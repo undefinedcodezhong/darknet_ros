@@ -3,7 +3,7 @@
 <launch>
   <!-- Console launch prefix -->
   <arg name="launch_prefix" default=""/>
-  <arg name="node_name" default="darknet_ros_people"/>
+  <arg name="node_name" default="darknet_ros"/>
 
   <!-- Config and weights folder. -->
   <arg name="yolo_weights_path"          default="$(find darknet_ros)/yolo_network_config/weights"/>
