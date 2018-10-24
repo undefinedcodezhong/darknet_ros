@@ -182,7 +182,7 @@ void YoloObjectDetector::init()
   nodeHandle_.param("publishers/detection_image/latch", detectionImageLatch, true);
 
   imageSubscriber_ = imageTransport_.subscribe(cameraTopicName, cameraQueueSize,
-                                               &YoloObjectDetector::cameraCallback, this);
+                                               &YoloObjectDetector::cameraCallback, this, image_transport::TransportHints("theora"));
   imageDepthSubscriber_ = imageTransport_.subscribe(cameraDepthTopicName, cameraQueueSize,
                                                &YoloObjectDetector::cameraDepthCallback, this);
 
